@@ -45,23 +45,17 @@ fn main() -> anyhow::Result<()> {
             rates.push(((index - 1) as f32, rate * 100_f32));
             avg_daily_expense += expenses / 30_f32;
             avg_daily_income += income / 30_f32;
-        }
-        // Total column
-        if index == all_expenses.len() - 1 {
-            let expenses: f32 = string_to_f32(value)?;
-            let income: f32 = string_to_f32(all_income.iter().nth(index).unwrap())?;
-            let rate = (income - expenses) / income;
-            let rate = if rate.is_nan() { 0_f32 } else { rate };
-            cummulative_rate = rate / (all_expenses.len() - 2) as f32;
+            cummulative_rate += rate;
         }
     }
-    avg_daily_income /= (all_expenses.len() - 2) as f32;
-    avg_daily_expense /= (all_expenses.len() - 2) as f32;
+    avg_daily_income /= (num_months) as f32;
+    avg_daily_expense /= (num_months) as f32;
+    cummulative_rate /= (num_months) as f32;
     let fire = avg_daily_expense * 365_f32 * 25_f32;
     let aaw = ((avg_daily_income * 365_f32 * 23_f32) / 10_f32 / 2_f32 - liabilities).abs();
     let paw = (((avg_daily_income * 365_f32 * 23_f32) / 10_f32) * 2_f32 - liabilities).abs();
 
-    println!("savings rate: last {} months", all_expenses.len() - 2);
+    println!("savings rate: last {} months", num_months);
     Chart::new(120, 60, 0.0, 8.0)
         .lineplot(&Shape::Steps(&rates))
         .nice();
