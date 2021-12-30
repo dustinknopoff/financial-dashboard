@@ -111,6 +111,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "finance-dash"
+version = "0.1.0"
+dependencies = [
+ "ansi_term",
+ "anyhow",
+ "csv",
+ "piechart",
+ "textplots",
+ "xshell",
+]
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -245,18 +257,6 @@ name = "ryu"
 version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "73b4b750c782965c211b42f022f59af1fbceabdd026623714f104152f1ec149f"
-
-[[package]]
-name = "savings-rate"
-version = "0.1.0"
-dependencies = [
- "ansi_term",
- "anyhow",
- "csv",
- "piechart",
- "textplots",
- "xshell",
-]
 
 [[package]]
 name = "serde"

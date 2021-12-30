@@ -108,7 +108,7 @@ fn fetch_expenses_this_month() -> anyhow::Result<Vec<StringRecord>> {
 }
 
 fn fetch_liabilities() -> anyhow::Result<f32> {
-    let output = cmd!("hledger bal Liabilities --format '%(total)'").read()?;
+    let output = cmd!("hledger bal Liabilities --format '%(total)' -X USD").read()?;
     let output = output.split('\n').last().unwrap();
     string_to_f32(output)
 }
