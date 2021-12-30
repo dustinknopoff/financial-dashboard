@@ -1,0 +1,14 @@
+[package]
+edition = "2021"
+name = "savings-rate"
+version = "0.1.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ansi_term = "0.12.1"
+anyhow = "1.0.52"
+csv = "1.1.6"
+piechart = "1.0.0"
+textplots = "0.8.0"
+xshell = "0.1.17"
