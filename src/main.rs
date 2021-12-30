@@ -33,10 +33,11 @@ fn main() -> anyhow::Result<()> {
     let mut rates: Vec<(f32, f32)> = Vec::with_capacity(max_capacity - 1);
     let mut avg_daily_expense = 0_f32;
     let mut avg_daily_income = 0_f32;
+    let num_months = all_expenses.len() - 2;
     for (index, value) in all_expenses.iter().enumerate() {
         // Columns for each month, skipping first column (account name) and last (total)
         // Get as numbers. Equation is (income - expenses) / income
-        if index != 0 && index <= all_expenses.len() - 2 {
+        if index != 0 && index <= num_months {
             let expenses: f32 = string_to_f32(value)?;
             let income: f32 = string_to_f32(all_income.iter().nth(index).unwrap())?;
             let rate = (income - expenses) / income;
@@ -60,7 +61,7 @@ fn main() -> anyhow::Result<()> {
     let aaw = ((avg_daily_income * 365_f32 * 23_f32) / 10_f32 / 2_f32 - liabilities).abs();
     let paw = (((avg_daily_income * 365_f32 * 23_f32) / 10_f32) * 2_f32 - liabilities).abs();
 
-    println!("savings rate: last 6 months");
+    println!("savings rate: last {} months", all_expenses.len() - 2);
     Chart::new(120, 60, 0.0, 8.0)
         .lineplot(&Shape::Steps(&rates))
         .nice();
