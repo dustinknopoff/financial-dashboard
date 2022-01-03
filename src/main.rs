@@ -1,8 +1,12 @@
 use ansi_term::Colour;
-use csv::{Reader, StringRecord};
 use piechart::Color;
 use textplots::{Chart, Plot, Shape};
+use types::{Balance, PeriodReport};
 use xshell::cmd;
+
+use crate::types::BalanceAccount;
+
+mod types;
 
 fn main() -> anyhow::Result<()> {
     // Constants
@@ -18,93 +22,51 @@ fn main() -> anyhow::Result<()> {
     // Fetch via hledger
     let liabilities = fetch_liabilities()?;
     let all_expenses = fetch_balance("Expenses")?;
-    // Fetch only total;
-    let all_expenses = match all_expenses
-        .iter()
-        .last() {
-            Some(val) => val,
-            None => anyhow::bail!("No expenses recorded. Calculating savings rate relies on comparisons between income and expenses.")
-        };
     let all_income = fetch_balance("Income")?;
-    // Fetch only total
-    let all_income = match all_income.iter().last() {
-        Some(val) => val,
-        None => anyhow::bail!("No income recorded. Calculating savings rate relies on comparisons between income and expenses.")
-    };
 
-    // Calculate
-    // Initializations
     let mut cummulative_rate = 0_f32;
-    let max_capacity = all_expenses.len();
-    let mut rates: Vec<(f32, f32)> = Vec::with_capacity(max_capacity - 1);
+    let mut rates: Vec<(f32, f32)> = Vec::with_capacity(all_expenses.num_dates());
     let mut avg_daily_expense = 0_f32;
     let mut avg_daily_income = 0_f32;
-    // Skips account name column and total column
-    // all_expenses.len() - 1 would be the last in the list
-    let num_months = all_expenses.len() - 2;
-    // We've prefiltered to remove all but the last row
-    // "account","2021-07","2021-08","2021-09","2021-10","2021-11","2021-12","total"
-    // "Expenses:1","0","0","0","0","0","16.50 USD","16.50 USD"
-    // "Expenses:2","0","0","0","0","0","30.00 USD","30.00 USD"
-    // "Expenses:3","0","0","0","0","0","350.00 USD","350.00 USD"
-    // "total","0","0","0","0","0","396.50 USD","396.50 USD"
-    //index: 0                                  index: len -1
-    // This is filtered to be on the `total` row. For each month
-    for (index, value) in all_expenses.iter().enumerate() {
-        // skipping first column (account name) and last (total)
-        if index != 0 && index <= num_months {
-            // My USD are reported as 1,000.00 USD,
-            // `string_to_f32` strips the comma and parses as a float
-            let expenses: f32 = string_to_f32(value)?;
-            // Grab the same index from the `Income` query and parse to float
-            let income: f32 = string_to_f32(all_income.iter().nth(index).unwrap())?;
-            // Calculate rate
-            let rate = (income - expenses) / income;
-            // If it's NaN, return 0
-            let rate = if rate.is_nan() { 0_f32 } else { rate };
-            // Push to our List for displaying as a step graph
-            rates.push(((index - 1) as f32, rate * 100_f32));
-            // Sum average daily expenses and income hard coded to a month as 30 days
-            avg_daily_expense += expenses / 30_f32;
-            avg_daily_income += income / 30_f32;
-            // Add to cummulative_rate
-            cummulative_rate += rate;
-        }
+    for row in 0..all_expenses.num_dates() {
+        let expenses = &all_expenses.total_at_index(row)[0];
+        let income = &all_income.total_at_index(row)[0];
+        let rate = (income.amount - expenses.amount) / income.amount;
+        // If it's NaN, return 0
+        let rate = if rate.is_nan() { 0_f32 } else { rate };
+        // Push to our List for displaying as a step graph
+        rates.push((row as f32, rate * 100_f32));
+        // Sum average daily expenses and income hard coded to a month as 30 days
+        avg_daily_expense += expenses.amount / 30_f32;
+        avg_daily_income += income.amount / 30_f32;
+        // Add to cummulative_rate
+        cummulative_rate += rate;
     }
     // Calculate average daily income over months in this + last quarter
-    avg_daily_income /= (num_months) as f32;
-    avg_daily_expense /= (num_months) as f32;
+    avg_daily_income /= (all_expenses.num_dates()) as f32;
+    avg_daily_expense /= (all_expenses.num_dates()) as f32;
     // calculate average savgins rate over months in this + last quarter
-    cummulative_rate /= (num_months) as f32;
+    cummulative_rate /= (all_expenses.num_dates()) as f32;
     let fire = avg_daily_expense * 365_f32 * 25_f32;
     let aaw = ((avg_daily_income * 365_f32 * 23_f32) / 10_f32 / 2_f32 - liabilities).abs();
     let paw = (((avg_daily_income * 365_f32 * 23_f32) / 10_f32) * 2_f32 - liabilities).abs();
 
-    let expenses_breakdown = fetch_expenses_this_month()?;
-    // Get final row/column as number
-    // "account","balance"
-    // "Expenses:1","16.50 USD"
-    // "Expenses:2","30.00 USD"
-    // "Expenses:3","350.00 USD"
-    // "total","396.50 USD"
-    //         ^ uses this number
-    let total: f32 = string_to_f32(expenses_breakdown.last().unwrap().iter().last().unwrap())?;
-    // Skipping the account name column,
-    // create the data structure for our piechart
-    let data: Vec<piechart::Data> = expenses_breakdown[..expenses_breakdown.len() - 1]
-        .iter()
+    let expenses_breakdown = BalanceAccount::new(fetch_expenses_this_month()?);
+    let data: Vec<piechart::Data> = expenses_breakdown
+        .get_expense_report()
+        .into_iter()
         .enumerate()
         .map(|(index, expense)| piechart::Data {
-            label: expense.get(0).unwrap().into(),
+            label: expense.label,
             // Value / total is percentage of total
-            value: string_to_f32(expense.get(1).unwrap()).unwrap() / total,
+            value: expense.amount,
             fill: fills[index % 5],
             color: Some(colors[index % 5].into()),
         })
         .collect();
 
-    // Present
-    println!("savings rate: last {} months", num_months);
+    // // Present
+    println!("savings rate: last {} months", all_expenses.num_dates());
     Chart::new(120, 60, 0.0, 8.0)
         .lineplot(&Shape::Steps(&rates))
         .nice();
@@ -123,17 +85,15 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn fetch_balance(account_prefix: &str) -> anyhow::Result<Vec<StringRecord>> {
+fn fetch_balance(account_prefix: &str) -> anyhow::Result<PeriodReport> {
     let output =
-        cmd!("hledger bal ^{account_prefix} -O csv -M -b lastquarter -C -U -T -X USD").read()?;
-    let mut rdr = Reader::from_reader(output.as_bytes());
-    Ok(rdr.records().filter_map(|record| record.ok()).collect())
+        cmd!("hledger bal ^{account_prefix} -O json -M -b lastquarter -C -U -X USD").read()?;
+    Ok(serde_json::from_str(&output)?)
 }
 
-fn fetch_expenses_this_month() -> anyhow::Result<Vec<StringRecord>> {
-    let output = cmd!("hledger bal ^Expenses  --begin thismonth -O csv -X USD").read()?;
-    let mut rdr = Reader::from_reader(output.as_bytes());
-    Ok(rdr.records().filter_map(|record| record.ok()).collect())
+fn fetch_expenses_this_month() -> anyhow::Result<Vec<Vec<Balance>>> {
+    let output = cmd!("hledger bal ^Expenses  --begin thismonth -O json -X USD").read()?;
+    Ok(serde_json::from_str(&output)?)
 }
 
 fn fetch_liabilities() -> anyhow::Result<f32> {
