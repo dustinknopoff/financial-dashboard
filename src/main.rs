@@ -88,12 +88,12 @@ fn main() -> anyhow::Result<()> {
 fn fetch_balance(account_prefix: &str) -> anyhow::Result<PeriodReport> {
     let output =
         cmd!("hledger bal ^{account_prefix} -O json -M -b lastquarter -C -U -X USD").read()?;
-    Ok(serde_json::from_str(&output)?)
+    Ok(serde_json::from_str(&output).expect("Failed to parse the balance"))
 }
 
 fn fetch_expenses_this_month() -> anyhow::Result<Vec<Vec<Balance>>> {
     let output = cmd!("hledger bal ^Expenses  --begin thismonth -O json -X USD").read()?;
-    Ok(serde_json::from_str(&output)?)
+    Ok(serde_json::from_str(&output).expect("Failed to retrieve expenses this month"))
 }
 
 fn fetch_liabilities() -> anyhow::Result<f32> {

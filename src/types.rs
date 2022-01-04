@@ -31,15 +31,70 @@ pub struct Quantity {
 #[derive(Debug, Deserialize, Clone)]
 pub struct Style {
     #[serde(rename = "ascommodityside")]
-    as_commidity_side: String,
+    as_commidity_side: Side,
     #[serde(rename = "ascommodityspaced")]
     as_commodity_spaced: bool,
     #[serde(rename = "asdecimalpoint")]
     as_decimal_point: String,
     #[serde(rename = "asdigitgroups")]
-    as_digits_group: (String, Vec<usize>),
+    as_digits_group: Option<(String, Vec<usize>)>,
     #[serde(rename = "asprecision")]
     as_precision: usize,
+}
+
+#[derive(Debug, Clone)]
+pub enum Side {
+    Left,
+    Right,
+}
+
+impl ::serde::Serialize for Side {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ::serde::Serializer,
+    {
+        serializer.serialize_str(match *self {
+            Side::Left => "L",
+            Side::Right => "R",
+        })
+    }
+}
+
+impl<'d> ::serde::Deserialize<'d> for Side {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'d>,
+    {
+        struct Visitor;
+
+        impl ::serde::de::Visitor<'_> for Visitor {
+            type Value = Side;
+
+            fn expecting(&self, formatter: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+                write!(formatter, "a string for {}", stringify!($name))
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<Side, E>
+            where
+                E: ::serde::de::Error,
+            {
+                match value {
+                    "L" => Ok(Side::Left),
+                    "R" => Ok(Side::Right),
+                    _ => Err(E::invalid_value(
+                        ::serde::de::Unexpected::Other(&format!(
+                            "unknown {} variant: {}",
+                            stringify!($name),
+                            value
+                        )),
+                        &self,
+                    )),
+                }
+            }
+        }
+
+        deserializer.deserialize_str(Visitor)
+    }
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -152,7 +207,12 @@ impl BalanceAccount {
     }
 
     pub fn get_expense_report(&self) -> Vec<ExpenseReport> {
-        let total = &self.get_totals()[0];
+        let total = if self.get_totals().is_empty() {
+            panic!("No expenses this month to calculate a total from!");
+        } else {
+            let tmp = &self.get_totals()[0];
+            tmp.clone()
+        };
         self.0[0]
             .clone()
             .into_iter()
