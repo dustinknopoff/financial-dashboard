@@ -31,7 +31,7 @@ fn main() -> anyhow::Result<()> {
     for row in 0..all_expenses.num_dates() {
         let expenses = &all_expenses.total_at_index(row)[0];
         let income = &all_income.total_at_index(row)[0];
-        let rate = if income.amount <= 0_f32 {
+        let rate = if income.amount == 0_f32 {
             0_f32
         } else {
             (income.amount - expenses.amount) / income.amount
