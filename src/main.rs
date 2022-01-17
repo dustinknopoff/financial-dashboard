@@ -31,9 +31,17 @@ fn main() -> anyhow::Result<()> {
     for row in 0..all_expenses.num_dates() {
         let expenses = &all_expenses.total_at_index(row)[0];
         let income = &all_income.total_at_index(row)[0];
-        let rate = (income.amount - expenses.amount) / income.amount;
+        let rate = if income.amount <= 0_f32 {
+            0_f32
+        } else {
+            (income.amount - expenses.amount) / income.amount
+        };
         // If it's NaN, return 0
-        let rate = if rate.is_nan() { 0_f32 } else { rate };
+        let rate = if rate.is_nan() || rate.is_infinite() {
+            0_f32
+        } else {
+            rate
+        };
         // Push to our List for displaying as a step graph
         rates.push((row as f32, rate * 100_f32));
         // Sum average daily expenses and income hard coded to a month as 30 days
